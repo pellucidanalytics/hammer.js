@@ -74,7 +74,12 @@ TouchAction.prototype = {
 
         // if the touch action did prevented once this session
         if (this.manager.session.prevented) {
-            srcEvent.preventDefault();
+            // IE8 doesn't have event.preventDefault
+            if (srcEvent.preventDefault) {
+                srcEvent.preventDefault();
+            } else {
+                srcEvent.returnValue = false;
+            }
             return;
         }
 
@@ -96,7 +101,13 @@ TouchAction.prototype = {
      */
     preventSrc: function(srcEvent) {
         this.manager.session.prevented = true;
-        srcEvent.preventDefault();
+
+        // IE8 doesn't have event.preventDefault
+        if (srcEvent.preventDefault) {
+            srcEvent.preventDefault();
+        } else {
+            srcEvent.returnValue = false;
+        }
     }
 };
 

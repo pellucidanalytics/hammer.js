@@ -69,6 +69,8 @@ Input.prototype = {
         this.evEl && addEventListeners(this.element, this.evEl, this.domHandler);
         this.evTarget && addEventListeners(this.target, this.evTarget, this.domHandler);
         this.evWin && addEventListeners(getWindowForElement(this.element), this.evWin, this.domHandler);
+        this.evDoc && addEventListeners(document, this.evDoc, this.domHandler);
+        this.evBody && addEventListeners(document.body, this.evBody, this.domHandler);
     },
 
     /**
@@ -78,6 +80,8 @@ Input.prototype = {
         this.evEl && removeEventListeners(this.element, this.evEl, this.domHandler);
         this.evTarget && removeEventListeners(this.target, this.evTarget, this.domHandler);
         this.evWin && removeEventListeners(getWindowForElement(this.element), this.evWin, this.domHandler);
+        this.evDoc && removeEventListeners(document, this.evDoc, this.domHandler);
+        this.evBody && removeEventListeners(document.body, this.evBody, this.domHandler);
     }
 };
 

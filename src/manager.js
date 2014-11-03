@@ -231,7 +231,12 @@ Manager.prototype = {
 
         data.type = event;
         data.preventDefault = function() {
-            data.srcEvent.preventDefault();
+            // IE8 doesn't have event.preventDefault
+            if (data.srcEvent.preventDefault) {
+                data.srcEvent.preventDefault();
+            } else {
+                data.srcEvent.returnValue = false;
+            }
         };
 
         var i = 0;

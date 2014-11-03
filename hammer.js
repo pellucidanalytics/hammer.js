@@ -1,4 +1,4 @@
-/*! Hammer.JS - v2.0.4 - 2014-09-28
+/*! Hammer.JS - v2.0.4 - 2014-11-04
  * http://hammerjs.github.io/
  *
  * Copyright (c) 2014 Jorik Tangelder;
@@ -13,7 +13,7 @@ var TYPE_FUNCTION = 'function';
 
 var round = Math.round;
 var abs = Math.abs;
-var now = Date.now;
+var now = Date.now || function() { return new Date().getTime(); };
 
 /**
  * set a timeout with a given scope
@@ -27,6 +27,19 @@ function setTimeoutContext(fn, timeout, context) {
 }
 
 /**
+ * Basic polyfill for ES5 Array.isArray
+ *
+ * @param {*} arg - object for which to check for arrayness
+ * @return {Boolean} - whether the object is an Array
+ */
+function isArray(arg) {
+    if (Array.isArray) {
+        return Array.isArray(arg);
+    }
+    return Object.prototype.toString.call(arg) === '[object Array]';
+}
+
+/**
  * if the argument is an array, we want to execute the fn on each entry
  * if it aint an array we don't want to do a thing.
  * this is used by all the methods that accept a single and array argument.
@@ -36,7 +49,7 @@ function setTimeoutContext(fn, timeout, context) {
  * @returns {Boolean}
  */
 function invokeArrayArg(arg, fn, context) {
-    if (Array.isArray(arg)) {
+    if (isArray(arg)) {
         each(arg, context[fn], context);
         return true;
     }
@@ -72,6 +85,50 @@ function each(obj, iterator, context) {
 }
 
 /**
+ * Basic Object.keys polyfill (for IE8 support)
+ *
+ * Uses native Object.keys if available, otherwise provides a basic polyfill.
+ *
+ * @param {Object} obj - Object for which to retrieve keys
+ * @returns {String[]} keys
+ */
+function objectKeys(obj) {
+    if (Object.keys) {
+        return Object.keys(obj);
+    }
+    var hasOwnProperty = Object.prototype.hasOwnProperty,
+        prop,
+        results = [];
+    for (prop in obj) {
+        if (hasOwnProperty.call(obj, prop)) {
+            results.push(prop);
+        }
+    }
+    return results;
+}
+
+/**
+ * Basic Object.create polyfill (for IE8 support)
+ *
+ * This does not support the second argument to Object.create (property descriptor).
+ *
+ * Uses native Object.create if available, otherwise provides a basic polyfill.
+ *
+ * @param {Object} proto - the prototype to use for the new Object
+ * @return {Object} - the new object
+ */
+function objectCreate(proto) {
+    if (Object.create) {
+        return Object.create(proto);
+    }
+    var Obj = function() {};
+    Obj.prototype = proto;
+    var result = new Obj();
+    Obj.prototype = null;
+    return result;
+}
+
+/**
  * extend object.
  * means that properties in dest will be overwritten by the ones in src.
  * @param {Object} dest
@@ -80,7 +137,7 @@ function each(obj, iterator, context) {
  * @returns {Object} dest
  */
 function extend(dest, src, merge) {
-    var keys = Object.keys(src);
+    var keys = objectKeys(src);
     var i = 0;
     while (i < keys.length) {
         if (!merge || (merge && dest[keys[i]] === undefined)) {
@@ -112,7 +169,7 @@ function inherit(child, base, properties) {
     var baseP = base.prototype,
         childP;
 
-    childP = child.prototype = Object.create(baseP);
+    childP = child.prototype = objectCreate(baseP);
     childP.constructor = child;
     childP._super = baseP;
 
@@ -165,7 +222,12 @@ function ifUndefined(val1, val2) {
  */
 function addEventListeners(target, types, handler) {
     each(splitStr(types), function(type) {
-        target.addEventListener(type, handler, false);
+        if (target.addEventListener) {
+            target.addEventListener(type, handler, false);
+        } else if (target.attachEvent) {
+            // IE8 uses an "on" prefix for event types (e.g. "onmousedown")
+            target.attachEvent('on' + type, handler, false);
+        }
     });
 }
 
@@ -177,7 +239,12 @@ function addEventListeners(target, types, handler) {
  */
 function removeEventListeners(target, types, handler) {
     each(splitStr(types), function(type) {
-        target.removeEventListener(type, handler, false);
+        if (target.removeEventListener) {
+            target.removeEventListener(type, handler, false);
+        } else if (target.detachEvent) {
+            // IE8 uses an "on" prefix for event types (e.g. "onmousedown")
+            target.detachEvent('on' + type, handler, false);
+        }
     });
 }
 
@@ -320,9 +387,11 @@ function uniqueId() {
  * @returns {DocumentView|Window}
  */
 function getWindowForElement(element) {
-    var doc = element.ownerDocument;
-    return (doc.defaultView || doc.parentWindow);
+    var doc = element.ownerDocument || element;
+    return (doc.defaultView || doc.parentWindow || window);
 }
+
+var isIE8 = window.navigator.userAgent.indexOf('MSIE 8') > 0;
 
 var MOBILE_REGEX = /mobile|tablet|ip(ad|hone|od)|android/i;
 
@@ -395,6 +464,8 @@ Input.prototype = {
         this.evEl && addEventListeners(this.element, this.evEl, this.domHandler);
         this.evTarget && addEventListeners(this.target, this.evTarget, this.domHandler);
         this.evWin && addEventListeners(getWindowForElement(this.element), this.evWin, this.domHandler);
+        this.evDoc && addEventListeners(document, this.evDoc, this.domHandler);
+        this.evBody && addEventListeners(document.body, this.evBody, this.domHandler);
     },
 
     /**
@@ -404,6 +475,8 @@ Input.prototype = {
         this.evEl && removeEventListeners(this.element, this.evEl, this.domHandler);
         this.evTarget && removeEventListeners(this.target, this.evTarget, this.domHandler);
         this.evWin && removeEventListeners(getWindowForElement(this.element), this.evWin, this.domHandler);
+        this.evDoc && removeEventListeners(document, this.evDoc, this.domHandler);
+        this.evBody && removeEventListeners(document.body, this.evBody, this.domHandler);
     }
 };
 
@@ -727,7 +800,13 @@ var MOUSE_WINDOW_EVENTS = 'mousemove mouseup';
  */
 function MouseInput() {
     this.evEl = MOUSE_ELEMENT_EVENTS;
-    this.evWin = MOUSE_WINDOW_EVENTS;
+
+    if (isIE8) {
+        // mousemove and moveup don't bubble to the window in IE8 - attach events to the document.body instead
+        this.evDoc = MOUSE_WINDOW_EVENTS;
+    } else {
+        this.evWin = MOUSE_WINDOW_EVENTS;
+    }
 
     this.allow = true; // used by Input.TouchMouse to disable mouse events
     this.pressed = false; // mousedown state
@@ -743,12 +822,25 @@ inherit(MouseInput, Input, {
     handler: function MEhandler(ev) {
         var eventType = MOUSE_INPUT_MAP[ev.type];
 
+        // IE8 uses non-standard button indices:
+        // http://msdn.microsoft.com/en-us/library/ie/ms533544(v=vs.85).aspx
+        // left button is 1
+        //
+        // Standard is here:
+        // http://msdn.microsoft.com/en-us/library/ie/ff974877(v=vs.85).aspx
+        // left button is 0
+        var leftMouseButton = 0;
+        if (isIE8) {
+            leftMouseButton = 1;
+        }
+
         // on start we want to have the left mouse button down
-        if (eventType & INPUT_START && ev.button === 0) {
+        if (eventType & INPUT_START && ev.button === leftMouseButton) {
             this.pressed = true;
         }
 
-        if (eventType & INPUT_MOVE && ev.which !== 1) {
+        // on move event, if a different button is pressed, stop the movement
+        if (eventType & INPUT_MOVE && ev.button !== leftMouseButton) {
             eventType = INPUT_END;
         }
 
@@ -1114,7 +1206,7 @@ TouchAction.prototype = {
             value = this.compute();
         }
 
-        if (NATIVE_TOUCH_ACTION) {
+        if (NATIVE_TOUCH_ACTION && this.manager.element.style) {
             this.manager.element.style[PREFIXED_TOUCH_ACTION] = value;
         }
         this.actions = value.toLowerCase().trim();
@@ -1156,7 +1248,12 @@ TouchAction.prototype = {
 
         // if the touch action did prevented once this session
         if (this.manager.session.prevented) {
-            srcEvent.preventDefault();
+            // IE8 doesn't have event.preventDefault
+            if (srcEvent.preventDefault) {
+                srcEvent.preventDefault();
+            } else {
+                srcEvent.returnValue = false;
+            }
             return;
         }
 
@@ -1178,7 +1275,13 @@ TouchAction.prototype = {
      */
     preventSrc: function(srcEvent) {
         this.manager.session.prevented = true;
-        srcEvent.preventDefault();
+
+        // IE8 doesn't have event.preventDefault
+        if (srcEvent.preventDefault) {
+            srcEvent.preventDefault();
+        } else {
+            srcEvent.returnValue = false;
+        }
     }
 };
 
@@ -1981,7 +2084,7 @@ inherit(TapRecognizer, Recognizer, {
     },
 
     emit: function() {
-        if (this.state == STATE_RECOGNIZED ) {
+        if (this.state == STATE_RECOGNIZED) {
             this._input.tapCount = this.count;
             this.manager.emit(this.options.event, this._input);
         }
@@ -2055,12 +2158,12 @@ Hammer.defaults = {
      */
     preset: [
         // RecognizerClass, options, [recognizeWith, ...], [requireFailure, ...]
-        [RotateRecognizer, { enable: false }],
-        [PinchRecognizer, { enable: false }, ['rotate']],
-        [SwipeRecognizer,{ direction: DIRECTION_HORIZONTAL }],
-        [PanRecognizer, { direction: DIRECTION_HORIZONTAL }, ['swipe']],
+        [RotateRecognizer, {enable: false}],
+        [PinchRecognizer, {enable: false}, ['rotate']],
+        [SwipeRecognizer, {direction: DIRECTION_HORIZONTAL}],
+        [PanRecognizer, {direction: DIRECTION_HORIZONTAL}, ['swipe']],
         [TapRecognizer],
-        [TapRecognizer, { event: 'doubletap', taps: 2 }, ['tap']],
+        [TapRecognizer, {event: 'doubletap', taps: 2}, ['tap']],
         [PressRecognizer]
     ],
 
@@ -2350,7 +2453,12 @@ Manager.prototype = {
 
         data.type = event;
         data.preventDefault = function() {
-            data.srcEvent.preventDefault();
+            // IE8 doesn't have event.preventDefault
+            if (data.srcEvent.preventDefault) {
+                data.srcEvent.preventDefault();
+            } else {
+                data.srcEvent.returnValue = false;
+            }
         };
 
         var i = 0;
@@ -2381,6 +2489,9 @@ Manager.prototype = {
  */
 function toggleCssProps(manager, add) {
     var element = manager.element;
+    if (!element.style) {
+        return;
+    }
     each(manager.options.cssProps, function(value, name) {
         element.style[prefixed(element.style, name)] = add ? value : '';
     });
