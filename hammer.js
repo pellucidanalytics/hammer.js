@@ -1,4 +1,4 @@
-/*! Hammer.JS - v2.0.4 - 2014-11-04
+/*! Hammer.JS - v2.0.4 - 2014-11-25
  * http://hammerjs.github.io/
  *
  * Copyright (c) 2014 Jorik Tangelder;
@@ -1730,10 +1730,10 @@ inherit(PanRecognizer, AttrRecognizer, {
         var direction = this.options.direction;
         var actions = [];
         if (direction & DIRECTION_HORIZONTAL) {
-            actions.push(TOUCH_ACTION_PAN_Y);
+            actions.push(TOUCH_ACTION_PAN_X);
         }
         if (direction & DIRECTION_VERTICAL) {
-            actions.push(TOUCH_ACTION_PAN_X);
+            actions.push(TOUCH_ACTION_PAN_Y);
         }
         return actions;
     },
