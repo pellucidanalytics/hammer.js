@@ -91,9 +91,23 @@ TouchAction.prototype = {
         if (hasNone ||
             (hasPanY && direction & DIRECTION_HORIZONTAL) ||
             (hasPanX && direction & DIRECTION_VERTICAL)) {
+
+            // Note (2014-12-30 awhite): I added this as a way to override the default behavior
+            // for preventing defaults for panning/swiping.
+            if (this.allowDefaults(input)) {
+                return;
+            }
+            // End awhite addition
+
             return this.preventSrc(srcEvent);
         }
     },
+
+    // Note (2014-12-30 awhite) added this
+    allowDefaults: function(/*input*/) {
+        return false;
+    },
+    // End awhite addition
 
     /**
      * call preventDefault to prevent the browser's default behavior (scrolling in most cases)
